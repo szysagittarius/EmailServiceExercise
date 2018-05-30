@@ -1,4 +1,5 @@
 using System;
+using System.Threading.Tasks;
 using EmailService.Contracts;
 using EmailService.Service;
 using Microsoft.Extensions.Logging;
@@ -46,5 +47,70 @@ namespace EmailServiceTests
         }
 
         //TODO: More tests!
+        [Fact]
+        public void Should_Handle_Connection_Failure()
+        {
+            var email = new Email { To = "George", Body = "Very Important!" };
+
+            // assume maxConnections is 10, so that I can test boundary value using 11
+            var client = new EmailClient(10);
+            var _eService = new EmailingService(client, _mockLogger.Object);
+
+            int numFailure = 0;
+
+            // try concurrency within 5s to test the boundary value using 11   
+            Parallel.For(0, 11, i =>
+            {
+                try
+                {
+                    var res = _eService.SendEmail(email);
+
+                    if (res == "Failure.")
+                    {
+                        numFailure++;
+                    }
+
+                }
+                catch (Exception)
+                {
+
+                }
+            });
+
+
+            Assert.True(numFailure > 0, "No Connection error found");
+        }
+
+
+        [Fact]
+        public void Should_Handle_Unexpected_Failure()
+        {
+            var email = new Email { To = "George", Body = "Very Important!" };
+
+
+            var _mockClient1 = new EmailClient(100);
+
+            var _eService = new EmailingService(_mockClient1, _mockLogger.Object);
+
+            int numFailure = 0;
+
+            Parallel.For(0, 20, i =>
+            {
+                try
+                {
+                    _eService.SendEmail(email);
+                }
+                catch (Exception e)
+                {
+                    if (e.Message.Contains("Unexpected Error"))
+                    {
+                        numFailure++;
+                    }
+                }
+            });
+
+            Assert.True(numFailure > 0, "No Connection error found");
+
+        }
     }
 }
